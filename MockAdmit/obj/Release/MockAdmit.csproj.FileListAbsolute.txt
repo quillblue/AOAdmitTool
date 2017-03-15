@@ -1,0 +1,9 @@
+E:\Projects\MockAdmit\MockAdmit\MockAdmit\bin\Release\MockAdmit.exe
+E:\Projects\MockAdmit\MockAdmit\MockAdmit\bin\Release\MockAdmit.pdb
+E:\Projects\MockAdmit\MockAdmit\MockAdmit\obj\Release\MockAdmit.FormChangeMajor.resources
+E:\Projects\MockAdmit\MockAdmit\MockAdmit\obj\Release\MockAdmit.FormMain.resources
+E:\Projects\MockAdmit\MockAdmit\MockAdmit\obj\Release\MockAdmit.Properties.Resources.resources
+E:\Projects\MockAdmit\MockAdmit\MockAdmit\obj\Release\MockAdmit.csproj.GenerateResource.Cache
+E:\Projects\MockAdmit\MockAdmit\MockAdmit\obj\Release\MockAdmit.exe
+E:\Projects\MockAdmit\MockAdmit\MockAdmit\obj\Release\MockAdmit.pdb
+E:\Projects\MockAdmit\MockAdmit\MockAdmit\obj\Release\MockAdmit.csprojResolveAssemblyReference.cache
