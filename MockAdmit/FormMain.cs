@@ -7,26 +7,21 @@ using System.Linq;
 using System.Text;
 using System.Windows.Forms;
 
-namespace MockAdmit
+namespace FudanAdmission.MockAdmit
 {
     public partial class FormMain : Form
     {
         private BindingList<Applier> applierList = new BindingList<Applier>();
         private BindingList<Major> majorList = new BindingList<Major>();
-        private int[] plannedLimit = new int[3] { 0, 0, 0 };
-        private int[] currentAdmitted = new int[3] { 0, 0, 0 };
-        private int[] scoreGap = new int[5] { 0, 0, 0, 0, 0 };
-        private Dictionary<String, int> subjectDict = new Dictionary<string, int>();
+        private BindingList<SubjectCategory> subjectCategoryList = new BindingList<SubjectCategory>();
+        private int[] scoreGap = new int[6] { 0,0,0,0,0,0};
 
         public FormMain()
         {
             InitializeComponent();
-            subjectDict.Add("文科", 0);
-            subjectDict.Add("理科", 1);
-            subjectDict.Add("医学", 2);
         }
 
-        private void btnSelcectApplierFile_Click(object sender, EventArgs e)
+        private void btnSelectApplierFile_Click(object sender, EventArgs e)
         {
             OpenFileDialog ofd = new OpenFileDialog();
             ofd.Filter = "Excel文件|*.xlsx;*.xls";
@@ -37,6 +32,26 @@ namespace MockAdmit
                 {
                     applierList = new BindingList<Applier>(ExcelParser.ParseApplierFile(ofd.FileName));
                     applierGrid.DataSource = applierList;
+                    IEnumerable<SubjectCategory> applierCount = applierList.GroupBy(applier => applier.Subject).Select(a => new SubjectCategory { Name = a.Key, ApplierCount = a.Count() });
+                    foreach (SubjectCategory sc in applierCount) {
+                        if (subjectCategoryList.Any(a => a.Name == sc.Name))
+                        {
+                            subjectCategoryList.First(a => a.Name == sc.Name).ApplierCount = sc.ApplierCount;
+                        }
+                        else {
+                            subjectCategoryList.Add(sc);
+                        }
+                    }
+                    List<String> subjectWithNoApplier = subjectCategoryList.Where(s => !applierList.Select(m => m.Subject).Contains(s.Name)).Select(s => s.Name).ToList();
+                    foreach (String subject in subjectWithNoApplier)
+                    {
+                        if (!majorList.Any(m => m.Subject == subject))
+                        {
+                            subjectCategoryList.Remove(subjectCategoryList.First(s => s.Name == subject));
+                        }
+                    }
+                    subjectGrid.DataSource = subjectCategoryList;
+                    RefreshGrid();
                 }
                 catch (Exception ex)
                 {
@@ -45,7 +60,7 @@ namespace MockAdmit
             }
         }
 
-        private void btnSelcectMajorPlan_Click(object sender, EventArgs e)
+        private void btnSelectMajorPlan_Click(object sender, EventArgs e)
         {
             OpenFileDialog ofd = new OpenFileDialog();
             ofd.Filter = "Excel文件|*.xlsx;*.xls";
@@ -56,12 +71,28 @@ namespace MockAdmit
                 {
                     majorList = new BindingList<Major>(ExcelParser.ParseMajorFile(ofd.FileName));
                     majorGrid.DataSource = majorList;
-                    plannedLimit[0] = majorList.Where(m => m.Subject == "文科").Sum(m => m.PlannedCapacity);
-                    plannedLimit[1] = majorList.Where(m => m.Subject == "理科").Sum(m => m.PlannedCapacity);
-                    plannedLimit[2] = majorList.Where(m => m.Subject == "医学").Sum(m => m.PlannedCapacity);
-                    textBoxPlan1.Text = plannedLimit[0].ToString();
-                    textBoxPlan2.Text = plannedLimit[1].ToString();
-                    textBoxPlan3.Text = plannedLimit[2].ToString();
+                    IEnumerable<SubjectCategory> majorCount = majorList.GroupBy(major => major.Subject).Select(a => new SubjectCategory { Name = a.Key, MajorPlanCount = a.Sum(m=>m.PlannedCapacity), PlannedAdmissionCount=a.Sum(m => m.PlannedCapacity) });
+                    foreach (SubjectCategory sc in majorCount)
+                    {
+                        if (subjectCategoryList.Any(a => a.Name == sc.Name))
+                        {
+                            subjectCategoryList.First(a => a.Name == sc.Name).MajorPlanCount = sc.MajorPlanCount;
+                            subjectCategoryList.First(a => a.Name == sc.Name).PlannedAdmissionCount = sc.PlannedAdmissionCount;
+                        }
+                        else
+                        {
+                            subjectCategoryList.Add(sc);
+                        }
+                    }
+                    List<String> subjectWithNoMajor = subjectCategoryList.Where(s => !majorList.Select(m => m.Subject).Contains(s.Name)).Select(s=>s.Name).ToList();
+                    foreach (String subject in subjectWithNoMajor)
+                    {
+                        if (!applierList.Any(a => a.Subject == subject)){
+                            subjectCategoryList.Remove(subjectCategoryList.First(s=>s.Name==subject));
+                        }
+                    }
+                    subjectGrid.DataSource = subjectCategoryList;
+                    RefreshGrid();
                 }
                 catch (Exception ex)
                 {
@@ -85,92 +116,33 @@ namespace MockAdmit
 
         private void btnStartAdmission_Click(object sender, EventArgs e)
         {
-            
             startAdmissionInitiallize();
-            double lastScore = 0;
-            List<String> admittedMajorInSameScore=new List<String>();
-            foreach (String subject in subjectDict.Keys)
-            {
-                lastScore = 0;
-                admittedMajorInSameScore.Clear();
-                UpdateWorkingStatus(String.Format("正在进行{0}投档", subject));
-                List<Applier> waitingPool = new List<Applier>(applierList.Where(a => a.Subject == subject).OrderByDescending(a => a.ScoreForAdmitting));
-                while (waitingPool.Count > 0)
-                {
-                    waitingPool.Sort();
-                    Applier applier = waitingPool.First();
-                    if (currentAdmitted[subjectDict[applier.Subject]] >= plannedLimit[subjectDict[applier.Subject]])
+            IEnumerable<String> subjectList = subjectCategoryList.Select(s => s.Name);
+            foreach (SubjectCategory sc in subjectCategoryList) {
+                if (sc.PlannedAdmissionCount > sc.MajorPlanCount) {
+                    if (MessageBox.Show("部分科类的拟录取数大于计划总数，是否继续？", "操作确认", MessageBoxButtons.YesNo) == DialogResult.No)
                     {
-                        waitingPool.RemoveAll(a => a.ScoreForAdmitting < lastScore);
-                        continue;
+                        admissionCleanUp();
+                        resetAdmission();
+                        return;
                     }
-                    if (applier.Score != lastScore)
-                    {
-                        lastScore = applier.Score;
-                        admittedMajorInSameScore.Clear();
-                    }
-                    if (applier.CurrentMajorForAdmitting >5|| !String.IsNullOrWhiteSpace(applier.PreferedMajor[applier.CurrentMajorForAdmitting]))
-                    {
-                        Major major = majorList.FirstOrDefault(m => m.Name == applier.PreferedMajor[applier.CurrentMajorForAdmitting] && m.Subject == applier.Subject);
-                        if (major != null)
-                        {
-                            if (major.RemainedCapacity > 0 || admittedMajorInSameScore.Contains(major.Name))
-                            {
-                                applier.BeAdmittedByMajorOrder(applier.CurrentMajorForAdmitting);
-                                majorList[majorList.IndexOf(major)].RemainedCapacity -= 1;
-                                majorGrid.DataSource = majorList;
-                                currentAdmitted[subjectDict[applier.Subject]] += 1;
-                                updateCurrentAdmittedCount();
-                                admittedMajorInSameScore.Add(major.Name);
-                                waitingPool.Remove(applier);
-                                continue;
-                            }
-                            else
-                            {
-                                applier.BeRejectedByMajorOrder(applier.CurrentMajorForAdmitting, scoreGap[applier.CurrentMajorForAdmitting]);
-                            }
-                        }
-                        else
-                        {
-                            UpdateWorkingStatus(String.Format("{0}考生{1}(报名号：{2})的第{3}志愿{4}在专业列表中没有找到，投档中断", subject, applier.Name, applier.RegisterNumber, applier.CurrentMajorForAdmitting + 1, applier.PreferedMajor[applier.CurrentMajorForAdmitting]), 2);
-                            admissionCleanUp();
-                            return;
-                        }
-                    }
-                    else {
-                        if (applier.AcceptChange)
-                        {
-                            UpdateWorkingStatus(String.Format("请为{0}选择调剂专业", applier.Name), 3);
-                            FormChangeMajor frmChangeMajor = new FormChangeMajor(applier, majorList.Where(m => m.RemainedCapacity > 0 && m.Subject == applier.Subject).ToList());
-                            DialogResult changeMajor = frmChangeMajor.ShowDialog();
-                            if (changeMajor == DialogResult.OK)
-                            {
-                                Major major = majorList.FirstOrDefault(m => m.Name == frmChangeMajor.selectedValue && m.Subject == applier.Subject);
-                                if (major != null)
-                                {
-                                    applier.Admitted = true;
-                                    applier.AdmittedMajor = major.Name;
-                                    applier.AdmittedMajorSource = "调剂";
-                                    major.RemainedCapacity -= 1;
-                                    majorGrid.DataSource = majorList;
-                                    currentAdmitted[subjectDict[applier.Subject]] += 1;
-                                    updateCurrentAdmittedCount();
-                                }
-                            }
-                            else
-                            {
-                                admissionCleanUp();
-                                resetAdmission();
-                                UpdateWorkingStatus("用户中断操作。", 2);
-                                return;
-                            }
-                        }
-                        waitingPool.Remove(applier);
-                    }
+                    else { break; }
                 }
             }
-            UpdateWorkingStatus("全部投档完成", 1);
-            admissionCleanUp();
+            try
+            {
+                foreach (String subject in subjectList)
+                {
+                    StartAdmission(subject);
+                }
+                UpdateWorkingStatus("全部投档完成", 1);
+                admissionCleanUp();
+            }
+            catch (Exception ex) {
+                UpdateWorkingStatus(ex.Message, 2);
+                admissionCleanUp();
+                resetAdmission();
+            }
         }
 
         private void btnReset_Click(object sender, EventArgs e)
@@ -180,36 +152,36 @@ namespace MockAdmit
 
         private void startAdmissionInitiallize()
         {
+            foreach (Major major in majorList)
+            {
+                major.RemainedCapacity = major.PlannedCapacity;
+            }
             scoreGap[0] = Convert.ToInt32(tbScoreGap1.Value);
             scoreGap[1] = Convert.ToInt32(tbScoreGap2.Value);
             scoreGap[2] = Convert.ToInt32(tbScoreGap3.Value);
             scoreGap[3] = Convert.ToInt32(tbScoreGap4.Value);
             scoreGap[4] = Convert.ToInt32(tbScoreGap5.Value);
-            plannedLimit = new int[3] { Convert.ToInt32(textBoxPlan1.Text), Convert.ToInt32(textBoxPlan2.Text), Convert.ToInt32(textBoxPlan3.Text) };
-            foreach (Major major in majorList)
-            {
-                major.RemainedCapacity = major.PlannedCapacity;
-            }
             majorGrid.DataSource = majorList;
             btnReset.Enabled = false;
             btnStartAdmission.Enabled = false;
-            btnSelcectApplierFile.Enabled = false;
-            btnSelcectMajorPlan.Enabled = false;
-            textBoxPlan1.Enabled = false;
-            textBoxPlan2.Enabled = false;
-            textBoxPlan3.Enabled = false;
+            btnSelectApplierFile.Enabled = false;
+            btnSelectMajorPlan.Enabled = false;
+            subjectGrid.ReadOnly = true;
+            applierGrid.ReadOnly = true;
+            GridRefreshTimer.Enabled = true;
         }
 
         private void admissionCleanUp()
         {
-            btnSelcectApplierFile.Enabled = true;
-            btnSelcectMajorPlan.Enabled = true;
+            btnSelectApplierFile.Enabled = true;
+            btnSelectMajorPlan.Enabled = true;
             btnReset.Enabled = true;
-            btnSelcectApplierFile.Enabled = true;
-            btnSelcectMajorPlan.Enabled = true;
-            textBoxPlan1.Enabled = true;
-            textBoxPlan2.Enabled = true;
-            textBoxPlan3.Enabled = true;
+            btnSelectApplierFile.Enabled = true;
+            btnSelectMajorPlan.Enabled = true;
+            subjectGrid.ReadOnly = false;
+            applierGrid.ReadOnly = false;
+            GridRefreshTimer.Enabled = false;
+            RefreshGrid();
         }
 
         private void resetAdmission() {
@@ -218,30 +190,139 @@ namespace MockAdmit
                 applier.Admitted = false;
                 applier.AdmittedMajor = "";
                 applier.AdmittedMajorSource = "";
+                applier.CurrentMajorForAdmitting = 0;
+                applier.ScoreForAdmitting = applier.Score;
             }
             foreach (Major major in majorList)
             {
                 major.RemainedCapacity = major.PlannedCapacity;
             }
+            foreach (SubjectCategory sc in subjectCategoryList) {
+                sc.ActualAdmissionCount = 0;
+            }
             btnStartAdmission.Enabled = true;
-            currentAdmitted = new int[3] { 0, 0, 0 };
-            updateCurrentAdmittedCount();
+            RefreshGrid();
         }
 
-        private void updateCurrentAdmittedCount()
+        private void RefreshGrid()
         {
-            textBoxCurrent1.Text = currentAdmitted[0].ToString();
-            textBoxCurrent2.Text = currentAdmitted[1].ToString();
-            textBoxCurrent3.Text = currentAdmitted[2].ToString();
+            applierGrid.Refresh();
+            majorGrid.Refresh();
+            subjectGrid.Refresh();
         }
 
         private void FormMain_SizeChanged(object sender, EventArgs e)
         {
-            applierGrid.Height = this.Height - 151;
-            majorGrid.Height = this.Height - 151;
+            applierGrid.Height = this.Height - 181;
+            majorGrid.Height = this.Height - 181;
             applierGrid.Width = this.Width - 322;
             majorGrid.Location=new Point(applierGrid.Width + 24,majorGrid.Location.Y);
         }
 
+        private void StartAdmission(String subject)
+        {
+            double lastScore = 99999;
+            List<String> admittedMajorInSameScore = new List<String>();
+            bool closed = false;
+
+            SubjectCategory subjectInfo = subjectCategoryList.First(s => s.Name == subject);
+            UpdateWorkingStatus(String.Format("正在进行{0}投档", subject));
+            List<Applier> waitingPool = new List<Applier>(applierList.Where(a => a.Subject == subject).OrderByDescending(a => a.ScoreForAdmitting));
+            List<Applier> changeMajorWaitingPool = new List<Applier>();
+            while (waitingPool.Count > 0)
+            {   
+                //Check whether admission (include pool waiting for change major) count reaches limitation. If yes, remove all appliers who are not be able to admit.
+                if (subjectInfo.ActualAdmissionCount >= subjectInfo.PlannedAdmissionCount&&!closed) {
+                    waitingPool.RemoveAll(a => a.Score < lastScore || !a.AcceptChange);
+                    closed = true;
+                }
+                if (!waitingPool.Any()) { break; }
+
+                //Sort and get first one in waiting pool, update last score and admittedMajorInSameScore accordingly
+                waitingPool.Sort();
+                Applier applier = waitingPool.First();
+                if (applier.ScoreForAdmitting != lastScore)
+                {
+                    lastScore = applier.Score;
+                    admittedMajorInSameScore.Clear();
+                }
+
+                //If this applier accept major change, he/she will sure be admitted, count his/her quota here.
+                if (applier.CurrentMajorForAdmitting == 0 && applier.AcceptChange) {
+                    subjectInfo.ActualAdmissionCount += 1;
+                }
+
+                Major major = majorList.FirstOrDefault(m => m.Name == applier.PreferedMajor[applier.CurrentMajorForAdmitting] && m.Subject == applier.Subject);
+                if (major != null)
+                {
+                    if (major.RemainedCapacity > 0 || admittedMajorInSameScore.Contains(major.Name))
+                    {
+                        applier.BeAdmittedByMajorOrder(applier.CurrentMajorForAdmitting);
+                        majorList[majorList.IndexOf(major)].RemainedCapacity -= 1;
+                        admittedMajorInSameScore.Add(major.Name);
+                        //Count applier's quota here if he/she does not accept change
+                        if (!applier.AcceptChange) { subjectInfo.ActualAdmissionCount += 1; }
+                        waitingPool.Remove(applier);
+                        continue;
+                    }
+                    else
+                    {
+                        applier.BeRejectedByMajorOrder(applier.CurrentMajorForAdmitting, scoreGap[applier.CurrentMajorForAdmitting]);
+                        if (applier.CurrentMajorForAdmitting > applier.PreferedMajor.Length-1) {
+                            if (applier.AcceptChange) { changeMajorWaitingPool.Add(applier); }
+                            waitingPool.Remove(applier);
+                        }
+                    }
+                }
+                else {
+                    throw new Exception(string.Format("{0}考生{1}(报名号：{2})的第{3}志愿{4}在专业列表中没有找到，{0}投档中断", subject, applier.Name, applier.RegisterNumber, applier.CurrentMajorForAdmitting + 1, applier.PreferedMajor[applier.CurrentMajorForAdmitting]));
+                }
+            }
+
+            changeMajorWaitingPool=changeMajorWaitingPool.OrderByDescending(a => a.Score).ToList();
+            foreach (Applier applier in changeMajorWaitingPool) {
+                UpdateWorkingStatus(String.Format("请为{0}选择调剂专业", applier.Name), 3);
+                FormChangeMajor frmChangeMajor = new FormChangeMajor(applier, majorList, applierList.Where(a=>Math.Abs(a.Score-applier.Score)<=1).Select(a=>a.AdmittedMajor).Distinct().ToList());
+                DialogResult changeMajor = frmChangeMajor.ShowDialog();
+                if (changeMajor == DialogResult.OK)
+                {
+                        applier.Admitted = true;
+                        applier.AdmittedMajor = frmChangeMajor.selectedMajor.Name;
+                        applier.AdmittedMajorSource = "调剂";
+                        frmChangeMajor.selectedMajor.RemainedCapacity -= 1;
+                        RefreshGrid();
+                }
+                else
+                {
+                    throw new Exception("用户中断操作。");
+                }
+            }
+        }
+
+        private void majorGrid_CellEndEdit(object sender, DataGridViewCellEventArgs e)
+        {
+            IEnumerable<SubjectCategory> majorCount = majorList.GroupBy(major => major.Subject).Select(a => new SubjectCategory { Name = a.Key, MajorPlanCount = a.Sum(m => m.PlannedCapacity), PlannedAdmissionCount = a.Sum(m => m.PlannedCapacity) });
+            foreach (SubjectCategory sc in majorCount)
+            {
+                if (subjectCategoryList.Any(a => a.Name == sc.Name))
+                {
+                    subjectCategoryList.First(a => a.Name == sc.Name).MajorPlanCount = sc.MajorPlanCount;
+                    subjectCategoryList.First(a => a.Name == sc.Name).PlannedAdmissionCount = sc.PlannedAdmissionCount;
+                }
+                else
+                {
+                    subjectCategoryList.Add(sc);
+                }
+            }
+            foreach (Major m in majorList) {
+                m.RemainedCapacity = m.PlannedCapacity;
+            }
+            RefreshGrid();
+        }
+
+        private void GridRefreshTimer_Tick(object sender, EventArgs e)
+        {
+            RefreshGrid();
+        }
     }
 }
