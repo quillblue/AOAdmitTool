@@ -5,7 +5,7 @@ using System.Data.OleDb;
 using System.Linq;
 using System.Text;
 
-namespace MockAdmit
+namespace FudanAdmission.MockAdmit
 {
     public class ExcelParser
     {
@@ -13,12 +13,14 @@ namespace MockAdmit
             DataTable dt = parseExcel(filePath);
             List<Applier> applierList = new List<Applier>();
             foreach (DataRow row in dt.Rows) {
+                if (String.IsNullOrEmpty(row[1].ToString().Trim())|| String.IsNullOrEmpty(row[0].ToString().Trim())|| String.IsNullOrEmpty(row[10].ToString().Trim())|| String.IsNullOrEmpty(row[2].ToString().Trim())) { continue; }
                 String applierName = row[1].ToString();
                 String applierRegisterNumber = row[0].ToString();
                 Double applierScore = Convert.ToDouble(row[10]);
                 String applierSubject = row[2].ToString();
                 bool acceptChange = row[9].ToString().ToLower() == "true";
                 String[] preferedMajor = new String[] { row[3].ToString(), row[4].ToString(), row[5].ToString(), row[6].ToString(), row[7].ToString(),row[8].ToString() };
+                preferedMajor = preferedMajor.Where(m => !string.IsNullOrWhiteSpace(m)).ToArray();
                 Applier applier = new Applier(applierName,applierRegisterNumber,applierSubject,applierScore, preferedMajor, acceptChange);
                 applierList.Add(applier);
             }
@@ -31,6 +33,7 @@ namespace MockAdmit
             List<Major> majorList = new List<Major>();
             foreach (DataRow row in dt.Rows)
             {
+                if (String.IsNullOrEmpty(row[1].ToString().Trim()) || String.IsNullOrEmpty(row[2].ToString().Trim()) || String.IsNullOrEmpty(row[0].ToString().Trim())) { continue; }
                 String majorName = row[1].ToString();
                 int plannedCapacity = Convert.ToInt32(row[2].ToString());
                 String majorSubject = row[0].ToString();
@@ -66,9 +69,9 @@ namespace MockAdmit
                 da.Fill(dt);
                 return dt;
             }
-            catch (Exception e)
+            catch (Exception)
             {
-                throw e;
+                throw;
             }
             finally
             {

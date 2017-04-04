@@ -16,3 +16,12 @@ E:\Projects\MockAdmit\MockAdmit\MockAdmit\obj\Debug\MockAdmit.Properties.Resourc
 E:\Projects\MockAdmit\MockAdmit\MockAdmit\obj\Debug\MockAdmit.csproj.GenerateResource.Cache
 E:\Projects\MockAdmit\MockAdmit\MockAdmit\bin\Debug\MockAdmit.exe
 E:\Projects\MockAdmit\MockAdmit\MockAdmit\bin\Debug\MockAdmit.pdb
+C:\Code\Personal\MockAdmit\MockAdmit\obj\Debug\MockAdmit.exe
+C:\Code\Personal\MockAdmit\MockAdmit\obj\Debug\MockAdmit.pdb
+C:\Code\Personal\MockAdmit\MockAdmit\obj\Debug\MockAdmit.csprojResolveAssemblyReference.cache
+C:\Code\Personal\MockAdmit\MockAdmit\obj\Debug\FudanAdmission.MockAdmit.FormChangeMajor.resources
+C:\Code\Personal\MockAdmit\MockAdmit\obj\Debug\FudanAdmission.MockAdmit.FormMain.resources
+C:\Code\Personal\MockAdmit\MockAdmit\obj\Debug\Quillblue.FDAO.MockAdmit.Properties.Resources.resources
+C:\Code\Personal\MockAdmit\MockAdmit\obj\Debug\MockAdmit.csproj.GenerateResource.Cache
+C:\Code\Personal\MockAdmit\MockAdmit\bin\Debug\MockAdmit.exe
+C:\Code\Personal\MockAdmit\MockAdmit\bin\Debug\MockAdmit.pdb
